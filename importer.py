@@ -1,5 +1,6 @@
 import json
 import requests
+import time
 from espn_api.football import League
 from sleeper.api import DraftAPIClient
 from sleeper.enum import Sport
@@ -88,4 +89,8 @@ def main():
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     main()
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"Execution time: {execution_time:.2f} seconds")
