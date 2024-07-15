@@ -81,6 +81,10 @@ Before you begin, ensure you have met the following requirements:
 5. Once the import is complete, check your ESPN league to verify the draft results. 
    - Go to your ESPN League's LM Tools and under `Draft Tools` click the `Input Offline Draft Results` button. This should take you to the page where you can modify the imported rosters and verify that you're finished submitting the draft results.
 
+## Example Video
+https://github.com/user-attachments/assets/60e21a82-44c2-4c18-9738-a3986fd65742
+
+
 ## Important Notes
 
 - This script will overwrite any existing draft data in your ESPN league. Use it with caution and only on leagues where you intend to replace the current draft.
