@@ -1,8 +1,10 @@
 import json
 import time
 import concurrent.futures
+import requests
 from urllib.parse import urlparse, parse_qs
 from espn_api.football import League
+from espn_api.requests.espn_requests import checkRequestStatus
 from sleeper.api import DraftAPIClient
 from sleeper.enum import Sport
 from sleeper.model import Draft, PlayerDraftPick
@@ -26,6 +28,15 @@ def load_espn_config(file_path='espn_config.json'):
     except json.JSONDecodeError:
         print(f"Invalid JSON in configuration file: {file_path}")
         return None, None, None, None
+
+
+def league_post(league: League, payload: dict = None, headers: dict = None, extend: str = ''):
+    endpoint = league.espn_request.LEAGUE_ENDPOINT + extend
+    r = requests.post(endpoint, json=payload, headers=headers, cookies=league.espn_request.cookies)
+    checkRequestStatus(r.status_code)
+    if league.espn_request.logger:
+        league.espn_request.logger.log_request(endpoint=endpoint, params=payload, headers=headers, response=r.json())
+    return r.json() if league.espn_request.year > 2017 else r.json()[0]
 
 
 def extract_draft_id_from_url(url):
