@@ -1,10 +1,11 @@
 import json
-import requests
 import time
+import concurrent.futures
+from urllib.parse import urlparse, parse_qs
 from espn_api.football import League
 from sleeper.api import DraftAPIClient
 from sleeper.enum import Sport
-from sleeper.model import Draft, DraftPick, PlayerDraftPick
+from sleeper.model import Draft, PlayerDraftPick
 from fantasy_football_id_mapper import load_player_ids_from_file, get_player_ids
 from collections import defaultdict
 
@@ -27,6 +28,14 @@ def load_espn_config(file_path='espn_config.json'):
         return None, None, None, None
 
 
+def extract_draft_id_from_url(url):
+    parsed_url = urlparse(url)
+    path_parts = parsed_url.path.split('/')
+    if path_parts[1] == 'draft' and path_parts[2] == 'nfl':
+        return path_parts[3]
+    return None
+
+
 def get_sleeper_draft(draft_id):
     draft: Draft = DraftAPIClient.get_draft(draft_id=draft_id)
     draft_picks: list[PlayerDraftPick] = DraftAPIClient.get_player_draft_picks(
@@ -35,20 +44,43 @@ def get_sleeper_draft(draft_id):
     return draft, draft_picks
 
 
+def batch_get_espn_players(league, player_ids):
+    batch_size = 50
+    all_players = []
+    for i in range(0, len(player_ids), batch_size):
+        batch = player_ids[i:i + batch_size]
+        players = league.player_info(playerId=batch)
+        all_players.extend(players)
+    return {player.playerId: player for player in all_players if player}
+
+
 def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, player_map):
     draft_slot_picks = defaultdict(list)
+    espn_ids = []
+    sleeper_to_espn_id = {}
+
     for pick in draft_picks:
         sleeper_player_id = str(pick.player_id)
         player_ids = get_player_ids(player_map, sleeper_player_id)
         espn_id = player_ids.get('espn_id')
         if espn_id:
-            espn_player = league.player_info(playerId=int(espn_id))
+            espn_ids.append(int(espn_id))
+            sleeper_to_espn_id[sleeper_player_id] = int(espn_id)
+        else:
+            print(f"No ESPN ID found for Sleeper ID: {sleeper_player_id}")
+
+    espn_players = batch_get_espn_players(league, espn_ids)
+
+    for pick in draft_picks:
+        sleeper_player_id = str(pick.player_id)
+        espn_id = sleeper_to_espn_id.get(sleeper_player_id)
+        if espn_id:
+            espn_player = espn_players.get(espn_id)
             if espn_player:
                 draft_slot_picks[pick.draft_slot].append(espn_player)
             else:
                 print(f"ESPN player not found for Sleeper ID: {sleeper_player_id}")
-        else:
-            print(f"No ESPN ID found for Sleeper ID: {sleeper_player_id}")
+
     return dict(draft_slot_picks)
 
 
@@ -73,8 +105,12 @@ def main():
     # Initialize the ESPN league
     league = League(league_id=LEAGUE_ID, year=YEAR, espn_s2=ESPN_S2, swid=SWID)
 
-    # Get Sleeper draft ID from user
-    sleeper_draft_id = input("Enter the Sleeper draft ID: ")
+    # Get Sleeper draft URL from user
+    sleeper_draft_url = input("Enter the Sleeper draft URL: ")
+    sleeper_draft_id = extract_draft_id_from_url(sleeper_draft_url)
+    if not sleeper_draft_id:
+        print("Invalid Sleeper draft URL. Exiting.")
+        return
 
     # Fetch draft data from Sleeper
     draft, draft_picks = get_sleeper_draft(sleeper_draft_id)
