@@ -58,7 +58,9 @@ Before you begin, ensure you have met the following requirements:
 
 3. For your ESPN league, set your Draft Settings `Draft Type` to `Offline`.
 
-4. Before running the script, you must make sure that the Draft Date/Time you set for the ESPN league's Offline Draft has already passed and the draft has begun.
+4. Verify that you have your draft order set correctly in ESPN, and that your Sleeper draft order mirrors the order set for your ESPN league.
+
+5. Before running the script, you must make sure that the Draft Date/Time you set for the ESPN league's Offline Draft has already passed and the draft has begun.
 
 ### Running the script
 
@@ -80,6 +82,10 @@ Before you begin, ensure you have met the following requirements:
 
 5. Once the import is complete, check your ESPN league to verify the draft results. 
    - Go to your ESPN League's LM Tools and under `Draft Tools` click the `Input Offline Draft Results` button. This should take you to the page where you can modify the imported rosters and verify that you're finished submitting the draft results.
+
+## Example Video
+https://github.com/user-attachments/assets/60e21a82-44c2-4c18-9738-a3986fd65742
+
 
 ## Important Notes
 
