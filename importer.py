@@ -37,8 +37,6 @@ def modify_endpoint_to_writes(endpoint: str) -> str:
 
 
 def league_post(league: League, payload: dict = None, headers: dict = None, extend: str = ''):
-    test = league.espn_request.get_league_draft()
-
     endpoint = league.espn_request.LEAGUE_ENDPOINT + extend
     write_endpoint = modify_endpoint_to_writes(endpoint)
     r = requests.post(write_endpoint, json=payload, headers=headers, cookies=league.espn_request.cookies)
