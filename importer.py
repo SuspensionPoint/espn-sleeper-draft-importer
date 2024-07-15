@@ -186,7 +186,29 @@ def import_all_draft_slots(league: League, draft: Draft, draft_slot_picks: dict)
         time.sleep(0.1)  # Delay to avoid rate limiting
 
 
+def download_latest_player_ids(file_path='player_ids.csv'):
+    url = "https://raw.githubusercontent.com/mayscopeland/ffb_ids/main/player_ids.csv"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(response.text)
+        print(f"Successfully downloaded and saved player IDs to {file_path}")
+    except requests.RequestException as e:
+        print(f"Error downloading player IDs: {e}")
+        return False
+    except IOError as e:
+        print(f"Error saving player IDs file: {e}")
+        return False
+    return True
+
+
 def main():
+    # Download the latest player IDs
+    if not download_latest_player_ids():
+        print("Failed to download latest player IDs. Exiting.")
+        return
+
     # Load ESPN configuration
     ESPN_S2, SWID, LEAGUE_ID, YEAR = load_espn_config()
     if not all([ESPN_S2, SWID, LEAGUE_ID, YEAR]):
