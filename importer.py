@@ -1,8 +1,6 @@
 import json
 import time
-import concurrent.futures
-from urllib.parse import urlparse, parse_qs
-
+from urllib.parse import urlparse, urlunparse
 import requests
 from espn_api.football import League
 from espn_api.requests.espn_requests import checkRequestStatus
@@ -31,9 +29,19 @@ def load_espn_config(file_path='espn_config.json'):
         return None, None, None, None
 
 
+def modify_endpoint_to_writes(endpoint: str) -> str:
+    parsed_url = urlparse(endpoint)
+    netloc = parsed_url.netloc.replace('lm-api-reads', 'lm-api-writes')
+    modified_url = parsed_url._replace(netloc=netloc)
+    return urlunparse(modified_url)
+
+
 def league_post(league: League, payload: dict = None, headers: dict = None, extend: str = ''):
+    test = league.espn_request.get_league_draft()
+
     endpoint = league.espn_request.LEAGUE_ENDPOINT + extend
-    r = requests.post(endpoint, json=payload, headers=headers, cookies=league.espn_request.cookies)
+    write_endpoint = modify_endpoint_to_writes(endpoint)
+    r = requests.post(write_endpoint, json=payload, headers=headers, cookies=league.espn_request.cookies)
     checkRequestStatus(r.status_code)
     if league.espn_request.logger:
         league.espn_request.logger.log_request(endpoint=endpoint, params=payload, headers=headers, response=r.json())
@@ -43,7 +51,7 @@ def league_post(league: League, payload: dict = None, headers: dict = None, exte
 def extract_draft_id_from_url(url):
     parsed_url = urlparse(url)
     path_parts = parsed_url.path.split('/')
-    if path_parts[1] == 'draft' and path_parts[2] == 'nfl':
+    if len(path_parts) >= 4 and path_parts[1] == 'draft' and path_parts[2] == 'nfl':
         return path_parts[3]
     return None
 
@@ -99,12 +107,53 @@ def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, play
     return dict(draft_slot_picks)
 
 
-def import_draft_to_espn(draft: Draft, draft_slot_picks: dict, league):
+def get_draft_slot_to_team_id_mapping(league: League):
+    draft_detail = league.espn_request.get_league_draft()['draftDetail']
+    mapping = {}
+    for pick in draft_detail['picks']:
+        if pick['roundId'] == 1:
+            mapping[pick['roundPickNumber']] = pick['teamId']
+    return mapping
+
+
+def import_draft_slot_to_espn(league: League, draft_slot: int, picks: list, slot_to_team_mapping: dict):
+    items = []
+    for pick in picks:
+        items.append({
+            "overallPickNumber": pick['pick_no'],
+            "type": "DRAFT",
+            "playerId": pick['player'].playerId
+        })
+
+    team_id = slot_to_team_mapping.get(draft_slot)
+    if team_id is None:
+        print(f"Error: No team ID found for draft slot {draft_slot}")
+        return None
+
+    payload = {
+        "isLeagueManager": True,
+        "teamId": team_id,
+        "type": "DRAFT",
+        "scoringPeriodId": 1,
+        "executionType": "EXECUTE",
+        "items": items
+    }
+
+    try:
+        response = league_post(league=league, payload=payload, extend="/transactions/")
+        print(f"Successfully imported draft for team {team_id} (draft slot {draft_slot})")
+        print(f"Response: {json.dumps(response, indent=2)}")
+        return response
+    except Exception as e:
+        print(f"Error importing draft for team {team_id} (draft slot {draft_slot}): {str(e)}")
+        return None
+
+
+def import_all_draft_slots(league: League, draft_slot_picks: dict):
+    slot_to_team_mapping = get_draft_slot_to_team_id_mapping(league)
     for draft_slot, picks in draft_slot_picks.items():
-        print(f"Draft Slot {draft_slot} selections:")
-        for pick in picks:
-            print(f"  Pick {pick['pick_no']}: {pick['player'].name}")
-        print()
+        import_draft_slot_to_espn(league, draft_slot, picks, slot_to_team_mapping)
+        time.sleep(0.1)  # Delay to avoid rate limiting
 
 
 def main():
@@ -134,7 +183,7 @@ def main():
     draft_slot_picks = map_sleeper_to_espn_players(draft_picks, league, player_map)
 
     # Import draft results into ESPN
-    # import_draft_to_espn(draft, draft_slot_picks, league)
+    import_all_draft_slots(league, draft_slot_picks)
 
     print("Import complete")
 
