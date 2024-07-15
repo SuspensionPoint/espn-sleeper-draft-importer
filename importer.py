@@ -1,8 +1,9 @@
 import json
 import time
 import concurrent.futures
-import requests
 from urllib.parse import urlparse, parse_qs
+
+import requests
 from espn_api.football import League
 from espn_api.requests.espn_requests import checkRequestStatus
 from sleeper.api import DraftAPIClient
@@ -88,7 +89,10 @@ def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, play
         if espn_id:
             espn_player = espn_players.get(espn_id)
             if espn_player:
-                draft_slot_picks[pick.draft_slot].append(espn_player)
+                draft_slot_picks[pick.draft_slot].append({
+                    'player': espn_player,
+                    'pick_no': pick.pick_no
+                })
             else:
                 print(f"ESPN player not found for Sleeper ID: {sleeper_player_id}")
 
@@ -96,10 +100,10 @@ def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, play
 
 
 def import_draft_to_espn(draft: Draft, draft_slot_picks: dict, league):
-    for draft_slot, players in draft_slot_picks.items():
+    for draft_slot, picks in draft_slot_picks.items():
         print(f"Draft Slot {draft_slot} selections:")
-        for player in players:
-            print(f"  - {player.name}")
+        for pick in picks:
+            print(f"  Pick {pick['pick_no']}: {pick['player'].name}")
         print()
 
 
