@@ -5,7 +5,7 @@ import requests
 from espn_api.football import League
 from espn_api.requests.espn_requests import checkRequestStatus
 from sleeper.api import DraftAPIClient
-from sleeper.enum import Sport
+from sleeper.enum import Sport, DraftType
 from sleeper.model import Draft, PlayerDraftPick
 from fantasy_football_id_mapper import load_player_ids_from_file, get_player_ids
 from collections import defaultdict
@@ -74,7 +74,32 @@ def batch_get_espn_players(league, player_ids):
     return {player.playerId: player for player in all_players if player}
 
 
-def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, player_map):
+def rearrange_linear_to_snake(draft_picks: list[PlayerDraftPick], num_teams: int):
+    team_picks = defaultdict(list)
+    for pick in draft_picks:
+        team_picks[pick.draft_slot].append(pick)
+
+    snake_picks = []
+    for round_num in range(1, len(draft_picks) // num_teams + 1):
+        round_picks = []
+        for team in range(1, num_teams + 1):
+            if round_num % 2 == 1:  # Odd rounds
+                pick = team_picks[team].pop(0)
+            else:  # Even rounds
+                pick = team_picks[num_teams - team + 1].pop(0)
+            round_picks.append(pick)
+        snake_picks.extend(round_picks)
+
+    for i, pick in enumerate(snake_picks):
+        pick.pick_no = i + 1
+
+    return snake_picks
+
+
+def map_sleeper_to_espn_players(draft: Draft, draft_picks: list[PlayerDraftPick], league, player_map):
+    if draft.type == DraftType.LINEAR:
+        draft_picks = rearrange_linear_to_snake(draft_picks, draft.settings.teams)
+
     draft_slot_picks = defaultdict(list)
     espn_ids = []
     sleeper_to_espn_id = {}
@@ -107,12 +132,17 @@ def map_sleeper_to_espn_players(draft_picks: list[PlayerDraftPick], league, play
     return dict(draft_slot_picks)
 
 
-def get_draft_slot_to_team_id_mapping(league: League):
+def get_draft_slot_to_team_id_mapping(league: League, num_teams: int):
     draft_detail = league.espn_request.get_league_draft()['draftDetail']
     mapping = {}
     for pick in draft_detail['picks']:
         if pick['roundId'] == 1:
             mapping[pick['roundPickNumber']] = pick['teamId']
+
+    for slot in range(1, num_teams + 1):
+        if slot not in mapping:
+            print(f"Warning: No team ID found for draft slot {slot}")
+
     return mapping
 
 
@@ -149,8 +179,8 @@ def import_draft_slot_to_espn(league: League, draft_slot: int, picks: list, slot
         return None
 
 
-def import_all_draft_slots(league: League, draft_slot_picks: dict):
-    slot_to_team_mapping = get_draft_slot_to_team_id_mapping(league)
+def import_all_draft_slots(league: League, draft: Draft, draft_slot_picks: dict):
+    slot_to_team_mapping = get_draft_slot_to_team_id_mapping(league, draft.settings.teams)
     for draft_slot, picks in draft_slot_picks.items():
         import_draft_slot_to_espn(league, draft_slot, picks, slot_to_team_mapping)
         time.sleep(0.1)  # Delay to avoid rate limiting
@@ -180,10 +210,10 @@ def main():
     draft, draft_picks = get_sleeper_draft(sleeper_draft_id)
 
     # Map Sleeper players to ESPN players
-    draft_slot_picks = map_sleeper_to_espn_players(draft_picks, league, player_map)
+    draft_slot_picks = map_sleeper_to_espn_players(draft, draft_picks, league, player_map)
 
     # Import draft results into ESPN
-    import_all_draft_slots(league, draft_slot_picks)
+    import_all_draft_slots(league, draft, draft_slot_picks)
 
     print("Import complete")
 
