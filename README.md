@@ -61,6 +61,9 @@ Before you begin, ensure you have met the following requirements:
 4. Verify that you have your draft order set correctly in ESPN, and that your Sleeper draft order mirrors the order set for your ESPN league.
 
 5. Before running the script, you must make sure that the Draft Date/Time you set for the ESPN league's Offline Draft has already passed and the draft has begun.
+   - In ESPN: Go to `LM Tools`
+   - Under `Draft Tools`, select `Input Offline Draft Results`
+   - Press the `Begin Offline Draft` button.
 
 ### Running the script
 
